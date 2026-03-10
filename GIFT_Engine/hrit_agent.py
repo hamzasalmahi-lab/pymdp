@@ -22,7 +22,8 @@ B = utils.random_B_matrix(num_states, [1])
 B[0][:, :, 0] = np.eye(2)
 
 # --- STEP D: INITIALIZE THE AGENT ---
-my_hrit_agent = Agent(A=A, B=B, C=C)
+# Lower learning rate (lr_pA=0.01) increases 'Surprise' for unstable events, preventing over-adaptation to pathological noise
+my_hrit_agent = Agent(A=A, B=B, C=C, lr_pA=0.01)
 
 # --- NEW STEP: THE ENGINE INTERFACE ---
 # This is the 'Glue' that main_engine.py needs to work!

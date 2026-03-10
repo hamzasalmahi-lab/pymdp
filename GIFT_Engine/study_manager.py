@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 import mne
 import matplotlib.pyplot as plt
+import scipy.stats as stats
 from scipy.stats import ttest_ind
 import logging
 import importlib
@@ -116,13 +117,10 @@ def run_single_file(filepath):
             metrics.variances.append(0.0)
 
     # compute summary numbers
-    # mean k after calibration (10s)
-    if len(metrics.ks) > BASELINE_DURATION:
-        mean_k = np.mean(metrics.ks[BASELINE_DURATION:])
-    else:
-        mean_k = np.mean(metrics.ks) if metrics.ks else np.nan
-
-    peak_variance = np.max(metrics.variances) if metrics.variances else 0.0
+    # Minimum k-score to catch 'Snap' events
+    min_k = np.min(metrics.ks) if metrics.ks else np.nan
+    # 90th percentile of variance to detect instability spikes
+    percentile_90_var = np.percentile(metrics.variances, 90) if metrics.variances else 0.0
     snap_count = classifier.snap_duration
     # learning delta: sum abs change in A
     initial_A = hrit_agent.A
@@ -137,8 +135,8 @@ def run_single_file(filepath):
         learning_delta = np.sum(np.abs(final_A - initial_A))
 
     return {
-        'mean_k': mean_k,
-        'peak_variance': peak_variance,
+        'min_k': min_k,
+        'percentile_90_var': percentile_90_var,
         'snap_count': snap_count,
         'learning_delta': learning_delta,
         'ks_distribution': metrics.ks,
@@ -160,8 +158,8 @@ def gather_group(directory, group_name):
         results.append({
             'group': group_name,
             'file': fname,
-            'mean_k': metrics['mean_k'],
-            'peak_variance': metrics['peak_variance'],
+            'min_k': metrics['min_k'],
+            'percentile_90_var': metrics['percentile_90_var'],
             'snap_count': metrics['snap_count'],
             'learning_delta': metrics['learning_delta'],
         })
@@ -178,27 +176,47 @@ def main():
     df.to_csv(csv_path, index=False)
     logging.info(f"Results written to {csv_path}")
 
-    # statistical comparison of mean_k
-    control_means = df[df.group == 'Control']['mean_k'].dropna()
-    path_means = df[df.group == 'Pathological']['mean_k'].dropna()
-    tstat, pval = ttest_ind(control_means, path_means, equal_var=False)
+    # statistical comparison of min_k
+    control_mins = df[df.group == 'Control']['min_k'].dropna()
+    path_mins = df[df.group == 'Pathological']['min_k'].dropna()
+    tstat, pval = ttest_ind(control_mins, path_mins, equal_var=False)
 
     print("\n===== RETROSPECTIVE STUDY SUMMARY =====\n")
-    print(df[['group', 'file', 'mean_k', 'peak_variance', 'snap_count', 'learning_delta']])
-    print(f"\np-value for Mean_K difference (Control vs Pathological): {pval:.4e}\n")
+    print(df[['group', 'file', 'min_k', 'percentile_90_var', 'snap_count', 'learning_delta']])
+    print(f"\np-value for Min_K difference (Control vs Pathological): {pval:.4e}\n")
 
-    # plot distributions
-    plt.figure(figsize=(8,6))
-    plt.hist(control_ks, bins=30, alpha=0.6, label='Control')
-    plt.hist(path_ks, bins=30, alpha=0.6, label='Pathological')
+    # plot distributions using KDE
+    plt.figure(figsize=(10,6))
+    
+    # KDE for Control
+    if control_ks:
+        kde_control = stats.gaussian_kde(control_ks)
+        x_control = np.linspace(min(control_ks), max(control_ks), 1000)
+        plt.plot(x_control, kde_control(x_control), label='Control', color='blue', linewidth=2)
+        plt.fill_between(x_control, kde_control(x_control), alpha=0.3, color='blue')
+    
+    # KDE for Pathological
+    if path_ks:
+        kde_path = stats.gaussian_kde(path_ks)
+        x_path = np.linspace(min(path_ks), max(path_ks), 1000)
+        plt.plot(x_path, kde_path(x_path), label='Pathological', color='red', linewidth=2)
+        plt.fill_between(x_path, kde_path(x_path), alpha=0.3, color='red')
+    
+    # Vertical line at k=0.4
+    plt.axvline(x=0.4, color='black', linestyle='--', linewidth=2, label='k = 0.4 Threshold')
+    
+    # Shade Clinical Risk Zone (below 0.4)
+    plt.axvspan(plt.xlim()[0], 0.4, alpha=0.2, color='red', label='Clinical Risk Zone')
+    
     plt.xlabel('k-score')
-    plt.ylabel('Frequency')
-    plt.title('Group Comparison of k-score Distributions')
+    plt.ylabel('Density')
+    plt.title('Group Comparison of k-score Distributions (KDE)')
     plt.legend()
+    plt.grid(alpha=0.3)
     plot_path = EXPORT_DIR / 'group_comparison_k_score.png'
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
-    logging.info(f"Group comparison plot saved to {plot_path}")
+    logging.info(f"Group comparison KDE plot saved to {plot_path}")
 
 
 if __name__ == '__main__':
