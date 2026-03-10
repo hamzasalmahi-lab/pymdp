@@ -1,0 +1,73 @@
+📡 Downloading temple_uva dataset...
+⚠️  Generating simulated patient dataset (30 samples)...
+✅ Dataset ready: 30 patient files
+================================================================================
+🧠 GIFT ENGINE: BATCH PROCESSING MODE
+================================================================================
+
+🔬 Processing Patient P001... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P002... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P003... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P004... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P005... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P006... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P007... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P008... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P009... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P010... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P011... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P012... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P013... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P014... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P015... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P016... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P017... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P018... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P019... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P020... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P021... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P022... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P023... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P024... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P025... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P026... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P027... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P028... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P029... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+🔬 Processing Patient P030... ❌ ERROR: cannot access local variable 'diagnosis' where it is not associated with a value
+
+✅ Results saved to /workspaces/pymdp/GIFT_Engine/batch_results/batch_results.json
+
+================================================================================
+🧬 COHORT-LEVEL ANALYSIS
+================================================================================
+================================================================================
