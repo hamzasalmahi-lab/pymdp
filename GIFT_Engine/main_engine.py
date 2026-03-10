@@ -164,7 +164,8 @@ def run_diagnostic_loop(iterations=30):
         if len(simulated_eeg_chunk) < 100:
             simulated_eeg_chunk = np.pad(simulated_eeg_chunk, (0, 100 - len(simulated_eeg_chunk)), mode='constant')
             
-        obs = get_observation_from_eeg(simulated_eeg_chunk)
+        # Extract observation using new preprocessing pipeline
+        obs, alpha_normalized, alpha_power = get_observation_from_eeg(simulated_eeg_chunk)
 
         # B. INFERENCE STEP (The 'Brain' thinks)
         belief = process_neural_signal(obs, my_hrit_agent)
@@ -187,6 +188,51 @@ def run_diagnostic_loop(iterations=30):
     # F. GENERATE DIAGNOSTIC REPORT
     report = classifier.generate_report(iterations)
     print(report)
+    
+    # G. PRINT AGENT LEARNING (A MATRIX CHANGES)
+    print("\n" + "=" * 80)
+    print("🧠 AGENT GENERATIVE MODEL (A MATRIX) - Belief Updates")
+    print("=" * 80)
+    print("\n📊 INITIAL A MATRIX (Prior Beliefs):")
+    print("   Observation → State Mapping (obs | state)")
+    print("   " + "-" * 70)
+    print(f"   State 0 (Stable):      Obs=0: {0.9:.2f}  |  Obs=1: {0.1:.2f}")
+    print(f"   State 1 (Unstable):    Obs=0: {0.3:.2f}  |  Obs=1: {0.7:.2f}")
+    print("\n   Interpretation:")
+    print("   • When agent believes state=STABLE: expects obs=0 (90% confidence)")
+    print("   • When agent believes state=UNSTABLE: expects obs=1 (70% confidence)")
+    
+    # Get final A matrix from agent
+    final_A = my_hrit_agent.A[0]
+    print(f"\n📊 FINAL A MATRIX (After {iterations} observations):")
+    print("   " + "-" * 70)
+    print(f"   State 0 (Stable):      Obs=0: {final_A[0, 0]:.4f}  |  Obs=1: {final_A[1, 0]:.4f}")
+    print(f"   State 1 (Unstable):    Obs=0: {final_A[0, 1]:.4f}  |  Obs=1: {final_A[1, 1]:.4f}")
+    
+    # Calculate changes
+    change_00 = final_A[0, 0] - 0.9
+    change_10 = final_A[1, 0] - 0.1
+    change_01 = final_A[0, 1] - 0.3
+    change_11 = final_A[1, 1] - 0.7
+    
+    print(f"\n📈 BELIEF UPDATES (Δ = Final - Initial):")
+    print("   " + "-" * 70)
+    print(f"   Stable state, obs=0:     {change_00:+.4f}  (was 0.9000, now {final_A[0, 0]:.4f})")
+    print(f"   Stable state, obs=1:     {change_10:+.4f}  (was 0.1000, now {final_A[1, 0]:.4f})")
+    print(f"   Unstable state, obs=0:   {change_01:+.4f}  (was 0.3000, now {final_A[0, 1]:.4f})")
+    print(f"   Unstable state, obs=1:   {change_11:+.4f}  (was 0.7000, now {final_A[1, 1]:.4f})")
+    
+    print(f"\n🔬 Clinical Interpretation:")
+    if abs(change_00) > 0.01 or abs(change_11) > 0.01:
+        print(f"   ✅ Agent LEARNED from EEG observations")
+        print(f"   • Updated stability beliefs by up to {max(abs(change_00), abs(change_11)):.4f}")
+        print(f"   • Model confidence improved through active inference")
+    else:
+        print(f"   ⚠️  Minimal learning detected")
+        print(f"   • Agent prior beliefs well-matched to data")
+        print(f"   • No significant Bayesian updates required")
+    
+    print("=" * 80)
 
 if __name__ == "__main__":
     run_diagnostic_loop()
