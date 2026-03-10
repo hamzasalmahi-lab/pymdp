@@ -1,4 +1,5 @@
 import numpy as np
+import mne
 import time
 
 # --- 1. INTERNAL IMPORTS ---
@@ -20,13 +21,24 @@ def run_diagnostic_loop(iterations=30):
     print("🧠 [HRIT-GIFT ENGINE]: ONLINE")
     print("📡 [MONITOR]: Watching for VPM Instability & Metric Collapse...")
     print("-" * 65)
+    
+    # Load real EEG data from MNE sample dataset
+    print("Loading sample EEG data...")
+    data_path = mne.datasets.sample.data_path()
+    raw_fname = data_path / 'MEG' / 'sample' / 'sample_audvis_raw.fif'
+    raw = mne.io.read_raw_fif(raw_fname, preload=True)
+    eeg_data = raw.get_data(picks='eeg')[0]  # Use first EEG channel
+    print(f"Loaded {len(eeg_data)} samples of EEG data.")
 
     for t in range(iterations):
-        # A. SENSOR STEP (Mocking MNE-Python)
-        # We simulate a brain signal that gets noisier as time passes
-        simulated_eeg_chunk = np.random.normal(0, 1, 100) 
-        if t > 15: # Simulate a stressor starting at 15 seconds
-            simulated_eeg_chunk += np.random.normal(0, 2, 100)
+        # A. SENSOR STEP (Using real EEG data)
+        start_idx = t * 100
+        end_idx = start_idx + 100
+        if end_idx > len(eeg_data):
+            end_idx = len(eeg_data)
+        simulated_eeg_chunk = eeg_data[start_idx:end_idx]
+        if len(simulated_eeg_chunk) < 100:
+            simulated_eeg_chunk = np.pad(simulated_eeg_chunk, (0, 100 - len(simulated_eeg_chunk)), mode='constant')
             
         obs = get_observation_from_eeg(simulated_eeg_chunk)
 
