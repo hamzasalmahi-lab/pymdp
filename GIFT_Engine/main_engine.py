@@ -8,6 +8,7 @@ try:
     from hrit_agent import my_hrit_agent, process_neural_signal 
     from sensor_interface import get_observation_from_eeg
     from manifold_geometry import calculate_k_score
+    from plot_learning import plot_agent_learning
 except ImportError as e:
     print(f"❌ ERROR: Could not find a support file. Make sure all .py files are in the same folder.\n{e}")
     exit()
@@ -233,6 +234,12 @@ def run_diagnostic_loop(iterations=30):
         print(f"   • No significant Bayesian updates required")
     
     print("=" * 80)
+    
+    # H. SAVE LEARNING VISUALIZATION
+    print("\n📊 Generating learning visualization...")
+    initial_A = np.array([[0.9, 0.3], [0.1, 0.7]])
+    plot_path = plot_agent_learning(initial_A, final_A, patient_id="GIFT_Engine_Single_Patient")
+    print(f"✅ Learning plot saved to: {plot_path}")
 
 if __name__ == "__main__":
     run_diagnostic_loop()
