@@ -1,6 +1,42 @@
 import numpy as np
 import mne
 import time
+import collections
+
+# --- GIFT SCORE FUSION FUNCTION ---
+def calculate_gift_score(k, rsi, vpm):
+    """
+    Calculate the unified GIFT (Geometric Inference of Free-energy Topology) score.
+    
+    This represents the 'Manifold Integrity' - a fused metric combining precision,
+    surprise, and volatility. Used as the primary variable for clinical decision-making.
+    
+    Formula: GIFT = k · RSI · (1 - clip(VPM · 10, 0, 1))
+    
+    Where:
+    - k: Manifold curvature (precision)
+    - RSI: Relative Stability Index (exp(-VFE))
+    - VPM: Volatility of Manifold Precision (std dev of k-scores)
+    
+    The formula penalizes high variance heavily, ensuring stability is rewarded.
+    
+    Parameters:
+    -----------
+    k : float
+        Current k-score (manifold precision)
+    rsi : float  
+        Relative Stability Index (exp(-VFE))
+    vpm : float
+        Volatility of Manifold Precision
+        
+    Returns:
+    --------
+    gift : float
+        Unified GIFT score (0-1 range, higher = more stable)
+    """
+    penalty = np.clip(vpm * 10, 0, 1)
+    gift = k * rsi * (1 - penalty)
+    return np.clip(gift, 0, 1)  # Ensure bounds
 
 # --- 1. INTERNAL IMPORTS ---
 # These connect your 'Brain', 'Sensor', and 'Geometry' files
@@ -159,6 +195,9 @@ def run_diagnostic_loop(iterations=30):
     # Initialize diagnostic classifier
     classifier = DiagnosticClassifier()
     
+    # Initialize VPM buffer for sliding window
+    vpm_buffer = collections.deque(maxlen=30)
+    
     # Load real EEG data from MNE sample dataset
     print("Loading sample EEG data...")
     data_path = mne.datasets.sample.data_path()
@@ -187,27 +226,24 @@ def run_diagnostic_loop(iterations=30):
         # C. GEOMETRY STEP (The 'Map' calculates curvature)
         k = calculate_k_score(belief)
 
+        # E. CALCULATE ADVANCED METRICS
+        # Update VPM buffer with current k-score
+        vpm_buffer.append(k)
+        vpm = np.std(list(vpm_buffer)) if len(vpm_buffer) > 1 else 0.0
+        rsi = np.exp(-my_hrit_agent.F) if hasattr(my_hrit_agent, 'F') and my_hrit_agent.F is not None else 1.0
+        gift = calculate_gift_score(k, rsi, vpm)
+
         # D. DIAGNOSTIC CLASSIFICATION
         diagnosis = classifier.update(t, k, obs, belief)
 
         # E. CLINICAL DASHBOARD
-        # Determine manifold stability
-        if "PHENOMENAL SNAP" in diagnosis:
-            manifold_stability = "Collapsed"
-            vpm_risk = "Critical"
-        elif "PRE-DISSOCIATIVE" in diagnosis:
-            manifold_stability = "Unstable"
-            vpm_risk = "Elevated"
-        else:
-            manifold_stability = "Stable"
-            vpm_risk = "Low"
-        
         print("╔══════════════════════════════════════════════════════════════╗")
         print("║                     CLINICAL DASHBOARD                      ║")
         print("╠══════════════════════════════════════════════════════════════╣")
-        print(f"║ Neural Precision:          {k:.4f}                           ║")
-        print(f"║ Manifold Stability:        {manifold_stability:<12}                     ║")
-        print(f"║ VPM Risk Level:           {vpm_risk:<12}                     ║")
+        print(f"║ Neural Precision (k):     {k:.4f}                           ║")
+        print(f"║ Relative Stability (RSI): {rsi:.4f}                         ║")
+        print(f"║ Manifold Volatility (VPM): {vpm:.4f}                       ║")
+        print(f"║ Unified GIFT Score:      {gift:.4f}                        ║")
         print("╚══════════════════════════════════════════════════════════════╝")
         
         time.sleep(1)  # Update every 1 second

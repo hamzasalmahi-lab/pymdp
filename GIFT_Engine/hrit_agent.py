@@ -26,6 +26,30 @@ B[0][:, :, 0] = np.eye(2)
 # Lower learning rate (lr_pA=0.01) increases 'Surprise' for unstable events, preventing over-adaptation to pathological noise
 my_hrit_agent = Agent(A=A, B=B, C=C, lr_pA=0.01)
 
+# --- ADD VPM BUFFER AND RSI PROPERTY ---
+import collections
+my_hrit_agent.vpm_buffer = collections.deque(maxlen=30)
+
+@property
+def rsi(my_hrit_agent):
+    """Calculate Relative Stability Index as exp(-VFE)"""
+    # Assuming latest VFE is available; in pymdp, this might need adjustment
+    try:
+        vfe = my_hrit_agent.F  # Free energy from last inference
+        return np.exp(-vfe)
+    except AttributeError:
+        return 1.0  # Default if not available
+
+my_hrit_agent.rsi = rsi
+
+def calculate_vpm(my_hrit_agent):
+    """Calculate VPM (Volatility of Manifold Precision) as std dev of k-score buffer"""
+    if len(my_hrit_agent.vpm_buffer) < 2:
+        return 0.0
+    return np.std(list(my_hrit_agent.vpm_buffer))
+
+my_hrit_agent.calculate_vpm = calculate_vpm
+
 # --- NEW STEP: THE ENGINE INTERFACE ---
 # This is the 'Glue' that main_engine.py needs to work!
 def process_neural_signal(observation_index, agent):

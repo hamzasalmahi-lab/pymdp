@@ -121,6 +121,10 @@ def run_single_file(filepath):
     min_k = np.min(metrics.ks) if metrics.ks else np.nan
     # 90th percentile of variance to detect instability spikes
     percentile_90_var = np.percentile(metrics.variances, 90) if metrics.variances else 0.0
+    # Calculate fused GIFT score (assuming RSI=1 for study, VPM=percentile_90_var)
+    rsi = 1.0  # Simplified for retrospective study
+    vpm = percentile_90_var
+    gift = min_k * rsi * (1 - np.clip(vpm * 10, 0, 1)) if not np.isnan(min_k) else np.nan
     snap_count = classifier.snap_duration
     # learning delta: sum abs change in A
     initial_A = hrit_agent.A
@@ -137,6 +141,7 @@ def run_single_file(filepath):
     return {
         'min_k': min_k,
         'percentile_90_var': percentile_90_var,
+        'gift': gift,
         'snap_count': snap_count,
         'learning_delta': learning_delta,
         'ks_distribution': metrics.ks,
@@ -145,7 +150,7 @@ def run_single_file(filepath):
 
 def gather_group(directory, group_name):
     results = []
-    min_ks = []
+    gift_scores = []
 
     for fname in os.listdir(directory):
         path = directory / fname
@@ -160,79 +165,80 @@ def gather_group(directory, group_name):
             'file': fname,
             'min_k': metrics['min_k'],
             'percentile_90_var': metrics['percentile_90_var'],
+            'gift': metrics['gift'],
             'snap_count': metrics['snap_count'],
             'learning_delta': metrics['learning_delta'],
         })
-        min_ks.append(metrics['min_k'])
-    return results, min_ks
+        gift_scores.append(metrics['gift'])
+    return results, gift_scores
 
 
 def main():
-    control_results, control_min_ks = gather_group(CONTROL_DIR, 'Control')
-    path_results, path_min_ks = gather_group(PATHOLOGICAL_DIR, 'Pathological')
+    control_results, control_gift_scores = gather_group(CONTROL_DIR, 'Control')
+    path_results, path_gift_scores = gather_group(PATHOLOGICAL_DIR, 'Pathological')
 
     df = pd.DataFrame(control_results + path_results)
     csv_path = EXPORT_DIR / 'retrospective_study_results.csv'
     df.to_csv(csv_path, index=False)
     logging.info(f"Results written to {csv_path}")
 
-    # statistical comparison of min_k
-    control_mins = df[df.group == 'Control']['min_k'].dropna()
-    path_mins = df[df.group == 'Pathological']['min_k'].dropna()
-    tstat, pval = ttest_ind(control_mins, path_mins, equal_var=False)
+    # statistical comparison of gift
+    control_gifts = df[df.group == 'Control']['gift'].dropna()
+    path_gifts = df[df.group == 'Pathological']['gift'].dropna()
+    tstat, pval = ttest_ind(control_gifts, path_gifts, equal_var=False)
 
     print("\n===== RETROSPECTIVE STUDY SUMMARY =====\n")
-    print(df[['group', 'file', 'min_k', 'percentile_90_var', 'snap_count', 'learning_delta']])
+    print(df[['group', 'file', 'min_k', 'percentile_90_var', 'gift', 'snap_count', 'learning_delta']])
     
     # Table for pathological minimum k-scores
-    print("\n===== PATHOLOGICAL GROUP MINIMUM K-SCORES =====\n")
-    path_df = df[df.group == 'Pathological'][['file', 'min_k']]
+    print("\n===== PATHOLOGICAL GROUP GIFT SCORES =====\n")
+    path_df = df[df.group == 'Pathological'][['file', 'gift']]
     print(path_df)
     
     # Check if any below 0.4
-    if (path_df['min_k'] < 0.4).any():
-        print("\n✅ Some pathological files reached the Risk Zone (k < 0.4)")
+    if (path_df['gift'] < 0.4).any():
+        print("\n✅ Some pathological files reached the Risk Zone (GIFT < 0.4)")
     else:
-        print("\n⚠️  No pathological files reached the Risk Zone (k < 0.4)")
+        print("\n⚠️  No pathological files reached the Risk Zone (GIFT < 0.4)")
         print("   Recommendation: Adjust sensor_interface.py to increase sensitivity to high-frequency noise")
     
-    print(f"\np-value for Min_K difference (Control vs Pathological): {pval:.4e}\n")
+    print(f"\np-value for GIFT Score difference (Control vs Pathological): {pval:.4e}\n")
 
-    # plot distributions of minimum k-scores
+    # plot distributions of GIFT scores
     plt.figure(figsize=(10,6))
     
     # For small datasets, use histogram; for larger, KDE
-    if len(control_min_ks) > 1:
-        kde_control = stats.gaussian_kde(control_min_ks)
-        x_control = np.linspace(min(control_min_ks), max(control_min_ks), 1000)
+    if len(control_gift_scores) > 1:
+        kde_control = stats.gaussian_kde(control_gift_scores)
+        x_control = np.linspace(min(control_gift_scores), max(control_gift_scores), 1000)
         plt.plot(x_control, kde_control(x_control), label='Control', color='blue', linewidth=2)
         plt.fill_between(x_control, kde_control(x_control), alpha=0.3, color='blue')
     else:
-        plt.hist(control_min_ks, bins=10, alpha=0.6, label='Control', color='blue', density=True)
+        plt.hist(control_gift_scores, bins=10, alpha=0.6, label='Control', color='blue', density=True)
     
-    if len(path_min_ks) > 1:
-        kde_path = stats.gaussian_kde(path_min_ks)
-        x_path = np.linspace(min(path_min_ks), max(path_min_ks), 1000)
+    if len(path_gift_scores) > 1:
+        kde_path = stats.gaussian_kde(path_gift_scores)
+        x_path = np.linspace(min(path_gift_scores), max(path_gift_scores), 1000)
         plt.plot(x_path, kde_path(x_path), label='Pathological', color='red', linewidth=2)
         plt.fill_between(x_path, kde_path(x_path), alpha=0.3, color='red')
     else:
-        plt.hist(path_min_ks, bins=10, alpha=0.6, label='Pathological', color='red', density=True)
+        plt.hist(path_gift_scores, bins=10, alpha=0.6, label='Pathological', color='red', density=True)
     
-    # Vertical line at k=0.4
-    plt.axvline(x=0.4, color='black', linestyle='--', linewidth=2, label='k = 0.4 Threshold')
+    # Vertical line at GIFT=0.4
+    plt.axvline(x=0.4, color='black', linestyle='--', linewidth=2, label='GIFT = 0.4 Threshold')
     
     # Shade Clinical Risk Zone (below 0.4)
     plt.axvspan(plt.xlim()[0], 0.4, alpha=0.2, color='red', label='Clinical Risk Zone')
     
-    plt.xlabel('Minimum k-score (Stability)')
+    plt.xlabel('Fused GIFT Score (Manifold Integrity)')
     plt.ylabel('Density')
-    plt.title('Distribution of Minimum k-score (Stability) per File')
+    plt.title('Distribution of Fused GIFT Scores (Manifold Integrity)')
     plt.legend()
     plt.grid(alpha=0.3)
     plot_path = EXPORT_DIR / 'group_comparison_k_score.png'
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
-    logging.info(f"Group comparison plot saved to {plot_path}")
+    logging.info(f"Group comparison KDE plot saved to {plot_path}")
 
 
 if __name__ == '__main__':
