@@ -14,13 +14,136 @@ except ImportError as e:
 
 # --- 2. VPM SENTINEL SETTINGS ---
 k_history = []
-VPM_THRESHOLD = 0.045 # From GIFT.pdf: The 'Wobble' limit
-WINDOW_SIZE = 5       # We analyze the last 5 seconds of data
+VPM_THRESHOLD = 0.045           # From GIFT.pdf: The 'Wobble' limit
+WINDOW_SIZE = 5                 # We analyze the last 5 seconds of data
+BASELINE_DURATION = 10          # First 10 seconds to establish baseline
+SNAP_THRESHOLD = 0.2            # k-score below this indicates Phenomenal Snap
+BASELINE_K_THRESHOLD = 0.05     # Variance threshold for baseline stability
+
+# --- 3. DIAGNOSTIC CLASSIFIER STATE ---
+class DiagnosticClassifier:
+    def __init__(self):
+        self.baseline_k_values = []
+        self.baseline_established = False
+        self.baseline_mean = None
+        self.k_values_all = []
+        self.diagnoses = []
+        self.state_counts = {
+            'stable': 0,
+            'pre_dissociative': 0,
+            'phenomenal_snap': 0
+        }
+        self.baseline_seconds_completed = 0
+        
+    def update(self, t, k, obs, belief):
+        """Update classifier with current neuroscience data"""
+        self.k_values_all.append(k)
+        
+        # Phase 1: Baseline Tracking (first 10 seconds of stable data)
+        if not self.baseline_established and t < BASELINE_DURATION:
+            if len(self.k_values_all) >= WINDOW_SIZE:
+                recent_variance = np.var(self.k_values_all[-WINDOW_SIZE:])
+                if recent_variance < BASELINE_K_THRESHOLD:
+                    self.baseline_k_values.append(k)
+            
+            if t == BASELINE_DURATION - 1 and len(self.baseline_k_values) >= 3:
+                self.baseline_mean = np.mean(self.baseline_k_values)
+                self.baseline_established = True
+                self.baseline_seconds_completed = BASELINE_DURATION
+        
+        # Phase 2: Real-time Diagnosis
+        if len(self.k_values_all) >= WINDOW_SIZE:
+            recent_k_hist = self.k_values_all[-WINDOW_SIZE:]
+            variance = np.var(recent_k_hist)
+            
+            # Diagnosis 1: Phenomenal Snap (Metric Collapse)
+            if k < SNAP_THRESHOLD:
+                diagnosis = "❌ DIAGNOSIS: PHENOMENAL SNAP"
+                self.state_counts['phenomenal_snap'] += 1
+                
+            # Diagnosis 2: Pre-Dissociative Instability
+            elif variance > VPM_THRESHOLD:
+                diagnosis = "⚠️  DIAGNOSIS: PRE-DISSOCIATIVE INSTABILITY"
+                self.state_counts['pre_dissociative'] += 1
+                
+            # Baseline: Stable
+            else:
+                diagnosis = "✅ STABLE"
+                self.state_counts['stable'] += 1
+            
+            self.diagnoses.append({
+                'time_s': t,
+                'k_score': k,
+                'variance': variance,
+                'diagnosis': diagnosis
+            })
+        else:
+            self.state_counts['stable'] += 1
+        
+        return diagnosis if len(self.diagnoses) > 0 else "✅ STABLE"
+    
+    def generate_report(self, total_time_s):
+        """Generate diagnostic summary report"""
+        total_states = sum(self.state_counts.values())
+        
+        report = []
+        report.append("\n" + "=" * 75)
+        report.append("🧬 GIFT ENGINE DIAGNOSTIC SUMMARY REPORT 🧬")
+        report.append("=" * 75)
+        
+        # Baseline Information
+        if self.baseline_established:
+            report.append(f"\n📊 BASELINE CALIBRATION (First {self.baseline_seconds_completed}s):")
+            report.append(f"   • Mean k-score (Baseline): {self.baseline_mean:.4f}")
+            report.append(f"   • Samples used for baseline: {len(self.baseline_k_values)}")
+        else:
+            report.append(f"\n⚠️  BASELINE: Not established (insufficient stable data)")
+        
+        # State Distribution
+        report.append(f"\n📈 STATE DISTRIBUTION (Total Time: {total_time_s}s):")
+        if total_states > 0:
+            stable_pct = (self.state_counts['stable'] / total_states) * 100
+            pre_diss_pct = (self.state_counts['pre_dissociative'] / total_states) * 100
+            snap_pct = (self.state_counts['phenomenal_snap'] / total_states) * 100
+            
+            report.append(f"   • ✅ STABLE: {self.state_counts['stable']} frames ({stable_pct:.1f}%)")
+            report.append(f"   • ⚠️  PRE-DISSOCIATIVE: {self.state_counts['pre_dissociative']} frames ({pre_diss_pct:.1f}%)")
+            report.append(f"   • ❌ PHENOMENAL SNAP: {self.state_counts['phenomenal_snap']} frames ({snap_pct:.1f}%)")
+        
+        # Statistical Summary
+        if self.k_values_all:
+            report.append(f"\n📐 K-SCORE STATISTICS:")
+            report.append(f"   • Mean k-score: {np.mean(self.k_values_all):.4f}")
+            report.append(f"   • Std Dev: {np.std(self.k_values_all):.4f}")
+            report.append(f"   • Min k-score: {np.min(self.k_values_all):.4f}")
+            report.append(f"   • Max k-score: {np.max(self.k_values_all):.4f}")
+        
+        # VPM Threshold Summary
+        report.append(f"\n⚙️  VPM SENTINEL THRESHOLDS:")
+        report.append(f"   • Variance Threshold (Pre-Dissociative): {VPM_THRESHOLD}")
+        report.append(f"   • Metric Collapse Threshold (Snap): {SNAP_THRESHOLD}")
+        report.append(f"   • Window Size: {WINDOW_SIZE}s")
+        
+        # Clinical Assessment
+        report.append(f"\n🔬 CLINICAL ASSESSMENT:")
+        if self.state_counts['phenomenal_snap'] > 0:
+            report.append(f"   ⚠️  ALERT: Phenomenal Snap detected ({self.state_counts['phenomenal_snap']} events)")
+        if self.state_counts['pre_dissociative'] > 0:
+            report.append(f"   ⚠️  ALERT: Pre-Dissociative Instability detected ({self.state_counts['pre_dissociative']} events)")
+        if self.state_counts['stable'] > (total_states * 0.7):
+            report.append(f"   ✅ System remained stable for most of the session")
+        
+        report.append("\n" + "=" * 75)
+        
+        return "\n".join(report)
 
 def run_diagnostic_loop(iterations=30):
     print("🧠 [HRIT-GIFT ENGINE]: ONLINE")
     print("📡 [MONITOR]: Watching for VPM Instability & Metric Collapse...")
-    print("-" * 65)
+    print("-" * 80)
+    
+    # Initialize diagnostic classifier
+    classifier = DiagnosticClassifier()
     
     # Load real EEG data from MNE sample dataset
     print("Loading sample EEG data...")
@@ -29,6 +152,7 @@ def run_diagnostic_loop(iterations=30):
     raw = mne.io.read_raw_fif(raw_fname, preload=True)
     eeg_data = raw.get_data(picks='eeg')[0]  # Use first EEG channel
     print(f"Loaded {len(eeg_data)} samples of EEG data.")
+    print("-" * 80)
 
     for t in range(iterations):
         # A. SENSOR STEP (Using real EEG data)
@@ -47,23 +171,22 @@ def run_diagnostic_loop(iterations=30):
 
         # C. GEOMETRY STEP (The 'Map' calculates curvature)
         k = calculate_k_score(belief)
-        k_history.append(k)
 
-        # D. VPM DIAGNOSTIC (The 'Alarm')
-        status = "✅ STABLE"
-        if len(k_history) >= WINDOW_SIZE:
-            k_history.pop(0)
-            variance = np.var(k_history)
-            
-            if variance > VPM_THRESHOLD:
-                status = "⚠️  VPM ALERT: CRITICAL WOBBLE"
-            elif k < 0.2:
-                status = "❌ CRITICAL: PHENOMENAL SNAP"
+        # D. DIAGNOSTIC CLASSIFICATION
+        diagnosis = classifier.update(t, k, obs, belief)
 
         # E. CONSOLE DASHBOARD
-        print(f"[{t:02d}s] | Input: {obs} | k-Score: {k:.2f} | {status}")
+        if len(classifier.k_values_all) >= WINDOW_SIZE:
+            current_variance = np.var(classifier.k_values_all[-WINDOW_SIZE:])
+            print(f"[{t:02d}s] | Obs: {obs} | k: {k:.4f} | σ²: {current_variance:.4f} | {diagnosis}")
+        else:
+            print(f"[{t:02d}s] | Obs: {obs} | k: {k:.4f} | σ²: -- (calibrating) | {diagnosis}")
         
         time.sleep(0.5) # Real-time simulation speed
+    
+    # F. GENERATE DIAGNOSTIC REPORT
+    report = classifier.generate_report(iterations)
+    print(report)
 
 if __name__ == "__main__":
     run_diagnostic_loop()
