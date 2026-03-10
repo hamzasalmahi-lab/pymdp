@@ -35,6 +35,7 @@ class DiagnosticClassifier:
             'phenomenal_snap': 0
         }
         self.baseline_seconds_completed = 0
+        self.snap_duration = 0  # Track total seconds of dissociative snap
         
     def update(self, t, k, obs, belief):
         """Update classifier with current neuroscience data"""
@@ -61,6 +62,7 @@ class DiagnosticClassifier:
             if k < SNAP_THRESHOLD:
                 diagnosis = "❌ DIAGNOSIS: PHENOMENAL SNAP"
                 self.state_counts['phenomenal_snap'] += 1
+                self.snap_duration += 1  # Track duration of dissociative snap
                 
             # Diagnosis 2: Pre-Dissociative Instability
             elif variance > VPM_THRESHOLD:
@@ -134,6 +136,17 @@ class DiagnosticClassifier:
         if self.state_counts['stable'] > (total_states * 0.7):
             report.append(f"   ✅ System remained stable for most of the session")
         
+        # Doctor's Note
+        report.append(f"\n👨‍⚕️ DOCTOR'S NOTE:")
+        if self.snap_duration > 0:
+            report.append(f"   • Total duration of Dissociative Snap: {self.snap_duration} seconds")
+            report.append(f"   • Clinical significance: Prolonged dissociative episodes may indicate severe neural instability")
+            report.append(f"   • Recommendation: Immediate clinical intervention and monitoring required")
+        else:
+            report.append(f"   • No dissociative snaps detected during monitoring period")
+            report.append(f"   • Patient maintained stable neural manifold throughout session")
+            report.append(f"   • Status: Neural integrity preserved")
+        
         report.append("\n" + "=" * 75)
         
         return "\n".join(report)
@@ -177,14 +190,27 @@ def run_diagnostic_loop(iterations=30):
         # D. DIAGNOSTIC CLASSIFICATION
         diagnosis = classifier.update(t, k, obs, belief)
 
-        # E. CONSOLE DASHBOARD
-        if len(classifier.k_values_all) >= WINDOW_SIZE:
-            current_variance = np.var(classifier.k_values_all[-WINDOW_SIZE:])
-            print(f"[{t:02d}s] | Obs: {obs} | k: {k:.4f} | σ²: {current_variance:.4f} | {diagnosis}")
+        # E. CLINICAL DASHBOARD
+        # Determine manifold stability
+        if "PHENOMENAL SNAP" in diagnosis:
+            manifold_stability = "Collapsed"
+            vpm_risk = "Critical"
+        elif "PRE-DISSOCIATIVE" in diagnosis:
+            manifold_stability = "Unstable"
+            vpm_risk = "Elevated"
         else:
-            print(f"[{t:02d}s] | Obs: {obs} | k: {k:.4f} | σ²: -- (calibrating) | {diagnosis}")
+            manifold_stability = "Stable"
+            vpm_risk = "Low"
         
-        time.sleep(0.5) # Real-time simulation speed
+        print("╔══════════════════════════════════════════════════════════════╗")
+        print("║                     CLINICAL DASHBOARD                      ║")
+        print("╠══════════════════════════════════════════════════════════════╣")
+        print(f"║ Neural Precision:          {k:.4f}                           ║")
+        print(f"║ Manifold Stability:        {manifold_stability:<12}                     ║")
+        print(f"║ VPM Risk Level:           {vpm_risk:<12}                     ║")
+        print("╚══════════════════════════════════════════════════════════════╝")
+        
+        time.sleep(1)  # Update every 1 second
     
     # F. GENERATE DIAGNOSTIC REPORT
     report = classifier.generate_report(iterations)
