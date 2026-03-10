@@ -1,0 +1,3 @@
+group,file,mean_k,peak_variance,snap_count,learning_delta
+Control,sample_control.fif,0.6999999999999998,0.015,0,0.0
+Pathological,sample_patho.fif,0.7249999999999999,0.015,0,0.0
