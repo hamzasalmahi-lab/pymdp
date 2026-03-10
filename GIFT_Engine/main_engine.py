@@ -1,62 +1,57 @@
 import numpy as np
 import time
-# Ensure hrit_agent.py is in the same folder
-from hrit_agent import my_hrit_agent, process_neural_signal 
 
-# --- CONSTANTS (HRIT/GIFT PARAMETERS) ---
-VPM_THRESHOLD = 0.045  # Variance threshold for 'Metric Instability'
-WINDOW_SIZE = 6        # How many seconds of history to analyze
-k_history = []         # Buffer for the GIFT-Score
+# --- 1. INTERNAL IMPORTS ---
+# These connect your 'Brain', 'Sensor', and 'Geometry' files
+try:
+    from hrit_agent import my_hrit_agent, process_neural_signal 
+    from sensor_interface import get_observation_from_eeg
+    from manifold_geometry import calculate_k_score
+except ImportError as e:
+    print(f"❌ ERROR: Could not find a support file. Make sure all .py files are in the same folder.\n{e}")
+    exit()
 
-def calculate_k_score(qs):
-    """
-    Calculates the GIFT-Score (k) using Information Geometry.
-    k = 1.0 (Manifold Depth/Presence) | k = 0.0 (Metric Collapse/Snap)
-    """
-    # Measure distance from the 'Uncertainty Center' (0.5)
-    # We use the absolute difference to quantify 'Belief Precision'
-    certainty = np.abs(qs[0] - 0.5) * 2
-    return round(float(certainty), 4)
+# --- 2. VPM SENTINEL SETTINGS ---
+k_history = []
+VPM_THRESHOLD = 0.045 # From GIFT.pdf: The 'Wobble' limit
+WINDOW_SIZE = 5       # We analyze the last 5 seconds of data
 
-def run_engine():
-    print("🧠 [HRIT-GIFT ENGINE]: ACTIVATED")
-    print("🛠️  [DIAGNOSTICS]: Monitoring VPM Variance & Phenomenal Snap Risk...")
-    print("-" * 60)
+def run_diagnostic_loop(iterations=30):
+    print("🧠 [HRIT-GIFT ENGINE]: ONLINE")
+    print("📡 [MONITOR]: Watching for VPM Instability & Metric Collapse...")
+    print("-" * 65)
 
-    try:
-        # Simulate a 30-second neural stream
-        for t in range(30):
-            # 1. SENSOR MOCK (Simulating MNE-Python output)
-            # As time increases, we simulate a 'stressor' increasing noise
-            noise_level = 1 if (t > 15 and np.random.random() > 0.4) else 0
+    for t in range(iterations):
+        # A. SENSOR STEP (Mocking MNE-Python)
+        # We simulate a brain signal that gets noisier as time passes
+        simulated_eeg_chunk = np.random.normal(0, 1, 100) 
+        if t > 15: # Simulate a stressor starting at 15 seconds
+            simulated_eeg_chunk += np.random.normal(0, 2, 100)
             
-            # 2. BRAIN (pymdp Inference)
-            # The agent 'thinks' about the noise signal
-            belief = process_neural_signal(noise_level, my_hrit_agent)
-            
-            # 3. GEOMETRY (GIFT Field Equation)
-            # We map the belief to a curvature score (k)
-            k = calculate_k_score(belief)
-            k_history.append(k)
-            
-            # 4. SENTINEL (VPM Early Warning)
-            status = "STABLE"
-            if len(k_history) >= WINDOW_SIZE:
-                k_history.pop(0)
-                # Calculate the 'Wobble' (Variance)
-                current_variance = np.var(k_history)
-                
-                if current_variance > VPM_THRESHOLD:
-                    status = "⚠️  VPM ALERT: INSTABILITY DETECTED"
-                elif k < 0.2:
-                    status = "❌ CRITICAL: PHENOMENAL SNAP"
+        obs = get_observation_from_eeg(simulated_eeg_chunk)
 
-            # CONSOLE DASHBOARD
-            print(f"[{t:02d}s] | Input: {noise_level} | k-Score: {k:.3f} | {status}")
-            time.sleep(0.4)
+        # B. INFERENCE STEP (The 'Brain' thinks)
+        belief = process_neural_signal(obs, my_hrit_agent)
 
-    except KeyboardInterrupt:
-        print("\n[ENGINE]: Manual Override. Shutting down...")
+        # C. GEOMETRY STEP (The 'Map' calculates curvature)
+        k = calculate_k_score(belief)
+        k_history.append(k)
+
+        # D. VPM DIAGNOSTIC (The 'Alarm')
+        status = "✅ STABLE"
+        if len(k_history) >= WINDOW_SIZE:
+            k_history.pop(0)
+            variance = np.var(k_history)
+            
+            if variance > VPM_THRESHOLD:
+                status = "⚠️  VPM ALERT: CRITICAL WOBBLE"
+            elif k < 0.2:
+                status = "❌ CRITICAL: PHENOMENAL SNAP"
+
+        # E. CONSOLE DASHBOARD
+        print(f"[{t:02d}s] | Input: {obs} | k-Score: {k:.2f} | {status}")
+        
+        time.sleep(0.5) # Real-time simulation speed
 
 if __name__ == "__main__":
-    run_engine()
+    run_diagnostic_loop()
