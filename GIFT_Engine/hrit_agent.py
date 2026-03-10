@@ -14,8 +14,9 @@ A[0][0, 1] = 0.3
 A[0][1, 1] = 0.7
 
 # --- STEP C: THE 'C' MATRIX ---
+# Increased precision: stronger preference for stable state to spike free energy harder on mismatches
 C = utils.obj_array(1)
-C[0] = np.array([2.0, -2.0])
+C[0] = np.array([4.0, -4.0])
 
 # --- STEP B2: THE 'B' MATRIX ---
 B = utils.random_B_matrix(num_states, [1])

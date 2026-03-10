@@ -145,7 +145,7 @@ def run_single_file(filepath):
 
 def gather_group(directory, group_name):
     results = []
-    all_ks = []
+    min_ks = []
 
     for fname in os.listdir(directory):
         path = directory / fname
@@ -163,13 +163,13 @@ def gather_group(directory, group_name):
             'snap_count': metrics['snap_count'],
             'learning_delta': metrics['learning_delta'],
         })
-        all_ks.extend(metrics['ks_distribution'])
-    return results, all_ks
+        min_ks.append(metrics['min_k'])
+    return results, min_ks
 
 
 def main():
-    control_results, control_ks = gather_group(CONTROL_DIR, 'Control')
-    path_results, path_ks = gather_group(PATHOLOGICAL_DIR, 'Pathological')
+    control_results, control_min_ks = gather_group(CONTROL_DIR, 'Control')
+    path_results, path_min_ks = gather_group(PATHOLOGICAL_DIR, 'Pathological')
 
     df = pd.DataFrame(control_results + path_results)
     csv_path = EXPORT_DIR / 'retrospective_study_results.csv'
@@ -183,24 +183,40 @@ def main():
 
     print("\n===== RETROSPECTIVE STUDY SUMMARY =====\n")
     print(df[['group', 'file', 'min_k', 'percentile_90_var', 'snap_count', 'learning_delta']])
+    
+    # Table for pathological minimum k-scores
+    print("\n===== PATHOLOGICAL GROUP MINIMUM K-SCORES =====\n")
+    path_df = df[df.group == 'Pathological'][['file', 'min_k']]
+    print(path_df)
+    
+    # Check if any below 0.4
+    if (path_df['min_k'] < 0.4).any():
+        print("\n✅ Some pathological files reached the Risk Zone (k < 0.4)")
+    else:
+        print("\n⚠️  No pathological files reached the Risk Zone (k < 0.4)")
+        print("   Recommendation: Adjust sensor_interface.py to increase sensitivity to high-frequency noise")
+    
     print(f"\np-value for Min_K difference (Control vs Pathological): {pval:.4e}\n")
 
-    # plot distributions using KDE
+    # plot distributions of minimum k-scores
     plt.figure(figsize=(10,6))
     
-    # KDE for Control
-    if control_ks:
-        kde_control = stats.gaussian_kde(control_ks)
-        x_control = np.linspace(min(control_ks), max(control_ks), 1000)
+    # For small datasets, use histogram; for larger, KDE
+    if len(control_min_ks) > 1:
+        kde_control = stats.gaussian_kde(control_min_ks)
+        x_control = np.linspace(min(control_min_ks), max(control_min_ks), 1000)
         plt.plot(x_control, kde_control(x_control), label='Control', color='blue', linewidth=2)
         plt.fill_between(x_control, kde_control(x_control), alpha=0.3, color='blue')
+    else:
+        plt.hist(control_min_ks, bins=10, alpha=0.6, label='Control', color='blue', density=True)
     
-    # KDE for Pathological
-    if path_ks:
-        kde_path = stats.gaussian_kde(path_ks)
-        x_path = np.linspace(min(path_ks), max(path_ks), 1000)
+    if len(path_min_ks) > 1:
+        kde_path = stats.gaussian_kde(path_min_ks)
+        x_path = np.linspace(min(path_min_ks), max(path_min_ks), 1000)
         plt.plot(x_path, kde_path(x_path), label='Pathological', color='red', linewidth=2)
         plt.fill_between(x_path, kde_path(x_path), alpha=0.3, color='red')
+    else:
+        plt.hist(path_min_ks, bins=10, alpha=0.6, label='Pathological', color='red', density=True)
     
     # Vertical line at k=0.4
     plt.axvline(x=0.4, color='black', linestyle='--', linewidth=2, label='k = 0.4 Threshold')
@@ -208,15 +224,15 @@ def main():
     # Shade Clinical Risk Zone (below 0.4)
     plt.axvspan(plt.xlim()[0], 0.4, alpha=0.2, color='red', label='Clinical Risk Zone')
     
-    plt.xlabel('k-score')
+    plt.xlabel('Minimum k-score (Stability)')
     plt.ylabel('Density')
-    plt.title('Group Comparison of k-score Distributions (KDE)')
+    plt.title('Distribution of Minimum k-score (Stability) per File')
     plt.legend()
     plt.grid(alpha=0.3)
     plot_path = EXPORT_DIR / 'group_comparison_k_score.png'
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
-    logging.info(f"Group comparison KDE plot saved to {plot_path}")
+    logging.info(f"Group comparison plot saved to {plot_path}")
 
 
 if __name__ == '__main__':

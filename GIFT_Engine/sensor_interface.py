@@ -149,9 +149,9 @@ def get_observation_from_eeg(raw_data_chunk, preprocessing=True):
     # Calculate alpha band power
     alpha_power, alpha_normalized = calculate_alpha_band_power(eeg_filtered)
     
-    # Classify: High alpha (>0.15 normalized) = Stable, Low alpha = Unstable
-    # Threshold tuned for typical EEG alpha power ranges
-    threshold = 0.15
+    # Classify: High alpha (>0.10 normalized) = Stable, Low alpha = Unstable
+    # Lowered threshold for increased sensitivity to high-frequency noise
+    threshold = 0.10
     observation = 0 if alpha_normalized >= threshold else 1
     
     return observation, alpha_normalized, alpha_power
