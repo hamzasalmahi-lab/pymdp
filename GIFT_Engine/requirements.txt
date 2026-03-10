@@ -1,0 +1,4 @@
+pymdp-agent
+numpy
+mne
+matplotlib
